@@ -1,5 +1,6 @@
 from pydub import AudioSegment
 from typing import List, Any
+import os
 import json
 import sys
 
@@ -13,10 +14,18 @@ def load_sound(path: str) -> AudioSegment:
     return AudioSegment.from_file(path)
 def apply_effects(sound: AudioSegment, effects: List[Any]) -> AudioSegment:
     for effect in effects:
+        if not isinstance(effect, list):
+            effect = [effect]
+
         if effect[0] == 'gain':
             sound = sound + effect[1]
         elif effect[0] == 'slice':
             sound = sound[effect[1] * 1000 : effect[2] * 1000]
+        elif effect[0] == 'mp3':
+            temp = '__temp_cvt__.mp3'
+            sound.export(temp)
+            sound = load_sound(temp)
+            os.remove(temp)
         else:
             raise RuntimeError(f'unknown effect type: {effect[0]}')
     return sound

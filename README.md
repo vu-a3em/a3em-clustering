@@ -59,3 +59,11 @@ Slices the audio clip at two points specified in seconds.
 ```json
 ["slice", <start>, <stop>]
 ```
+
+## Effects - mp3
+
+Round trips the clip to mp3 and back into (in-memory) wav.
+
+```json
+["mp3"]
+```
