@@ -1,11 +1,14 @@
+import json
+import uuid
+import sys
+import os
+
 from pydub import AudioSegment
 from typing import List, Any
-import os
-import json
-import sys
+from util import load_sound
 
-if len(sys.argv) != 2:
-    print(f'usage: {sys.argv[0]} [sim file]', file = sys.stderr)
+if len(sys.argv) not in [2, 3]:
+    print(f'usage: {sys.argv[0]} [sim file] (out path)', file = sys.stderr)
     sys.exit(1)
 if sys.argv[1] == '-':
     sim = json.load(sys.stdin)
@@ -13,8 +16,6 @@ else:
     with open(sys.argv[1], 'r') as f:
         sim = json.load(f)
 
-def load_sound(path: str) -> AudioSegment:
-    return AudioSegment.from_file(path)
 def apply_effects(sound: AudioSegment, effects: List[Any]) -> AudioSegment:
     for effect in effects:
         if not isinstance(effect, list):
@@ -25,7 +26,7 @@ def apply_effects(sound: AudioSegment, effects: List[Any]) -> AudioSegment:
         elif effect[0] == 'slice':
             sound = sound[effect[1] * 1000 : effect[2] * 1000]
         elif effect[0] == 'mp3':
-            temp = '__temp_cvt__.mp3'
+            temp = f'__temp_cvt__{uuid.uuid4().hex}.mp3'
             sound.export(temp)
             sound = load_sound(temp)
             os.remove(temp)
@@ -45,4 +46,4 @@ for i, event in enumerate(sim['events']):
     sound = apply_effects(sounds[i], event.get('effects', []))
     res = res.overlay(sound, event.get('start', 0) * 1000)
 res = apply_effects(res, sim.get('effects', []))
-res.export('out.wav')
+res.export(sys.argv[2] if 2 < len(sys.argv) else 'out.wav')

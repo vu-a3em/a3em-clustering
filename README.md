@@ -20,6 +20,12 @@ Json files can also be piped into the simulation via the special token `-` as th
 cat my-sim.json | python sim.py -
 ```
 
+Loading from stdin can be helpful when using the json generator `gen.py`.
+
+```sh
+python gen.py -h
+```
+
 # Simulation File Schema
 
 Each simulation is a single JSON file.
