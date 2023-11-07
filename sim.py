@@ -37,13 +37,14 @@ def apply_effects(sound: AudioSegment, effects: List[Any]) -> AudioSegment:
 duration = 0
 sounds = []
 for event in sim['events']:
-    sound = load_sound(event['source'])
+    sound = apply_effects(load_sound(event['source']), event.get('effects', []))
     sounds.append(sound)
     duration = max(duration, event.get('start', 0) + sound.duration_seconds)
 
 res = AudioSegment.silent(duration * 1000)
 for i, event in enumerate(sim['events']):
-    sound = apply_effects(sounds[i], event.get('effects', []))
+    sound = sounds[i]
     res = res.overlay(sound, event.get('start', 0) * 1000)
 res = apply_effects(res, sim.get('effects', []))
+
 res.export(sys.argv[2] if 2 < len(sys.argv) else 'out.wav')
