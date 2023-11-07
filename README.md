@@ -14,6 +14,12 @@ Simply run `sim.py` with the path to a simulation file:
 python sim.py my-sim.json
 ```
 
+Json files can also be piped into the simulation via the special token `-` as the input file:
+
+```sh
+cat my-sim.json | python sim.py -
+```
+
 # Simulation File Schema
 
 Each simulation is a single JSON file.

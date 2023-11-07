@@ -7,8 +7,11 @@ import sys
 if len(sys.argv) != 2:
     print(f'usage: {sys.argv[0]} [sim file]', file = sys.stderr)
     sys.exit(1)
-with open(sys.argv[1], 'r') as f:
-    sim = json.load(f)
+if sys.argv[1] == '-':
+    sim = json.load(sys.stdin)
+else:
+    with open(sys.argv[1], 'r') as f:
+        sim = json.load(f)
 
 def load_sound(path: str) -> AudioSegment:
     return AudioSegment.from_file(path)
