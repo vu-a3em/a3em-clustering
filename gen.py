@@ -14,13 +14,18 @@ parser.add_argument('-n', type = int, required = True)
 parser.add_argument('--min-gain', type = float, default = 0.0)
 parser.add_argument('--max-gain', type = float, default = 0.0)
 parser.add_argument('--mp3-chance', type = float, default = 0.0)
+parser.add_argument('--seed', type = int)
 args = parser.parse_args()
+
+if args.seed:
+    random.seed(args.seed)
 
 def get_all_sounds(path: str) -> List[str]:
     res = []
     for root, dirs, files in os.walk(path):
         for file in files:
             res.append(os.path.join(root, file))
+    res.sort() # ensure a consistent ordering
     return res
 def gen_effects() -> List:
     res = []
@@ -48,6 +53,7 @@ output = {
         {
             'source': background,
             'start': 0,
+            'duration': background_length,
             'effects': gen_effects(),
         }
     ],
@@ -63,6 +69,7 @@ for i in range(args.n):
     output['events'].append({
         'source': event,
         'start': t,
+        'duration': event_length,
         'effects': gen_effects(),
     })
 json.dump(output, sys.stdout, indent = 4)
