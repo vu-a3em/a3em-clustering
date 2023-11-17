@@ -27,7 +27,7 @@ def apply_effects(sound: AudioSegment, effects: List[Any]) -> AudioSegment:
             sound = sound[effect[1] * 1000 : effect[2] * 1000]
         elif effect[0] == 'mp3':
             temp = f'__temp_cvt__{uuid.uuid4().hex}.mp3'
-            sound.export(temp)
+            sound.export(temp, format = 'mp3')
             sound = load_sound(temp)
             os.remove(temp)
         else:
@@ -47,4 +47,4 @@ for i, event in enumerate(sim['events']):
     res = res.overlay(sound, event.get('start', 0) * 1000)
 res = apply_effects(res, sim.get('effects', []))
 
-res.export(sys.argv[2] if 2 < len(sys.argv) else 'out.wav')
+res.export(sys.argv[2] if 2 < len(sys.argv) else 'out.wav', format = 'wav')
