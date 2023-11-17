@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import scipy.io.wavfile as wav
+import scipy.signal as sig
 import numpy as np
 
 import argparse
@@ -10,7 +11,8 @@ from util import load_sound
 parser = argparse.ArgumentParser()
 parser.add_argument('source')
 parser.add_argument('labels')
-parser.add_argument('--event', type = int)
+parser.add_argument('-e', '--event', type = int)
+parser.add_argument('-s', '--spectrum', action = 'store_true')
 args = parser.parse_args()
 
 def clamp(x, minimum, maximum):
@@ -35,9 +37,17 @@ if args.event is not None:
 else:
     title = args.source
 
-for i, channel in enumerate(channels):
-    plt.plot(np.arange(len(channel)) / sample_rate, channel, label = f'channel {i + 1}')
+if args.spectrum:
+    combined = np.average(channels, axis = 0)
+    f, t, Sxx = sig.spectrogram(combined, sample_rate)
+    plt.pcolormesh(t, f, np.log10(Sxx))
+    plt.ylabel('frequency (Hz)')
+else:
+    for i, channel in enumerate(channels):
+        plt.plot(np.arange(len(channel)) / sample_rate, channel, label = f'channel {i + 1}')
+    plt.ylabel('amplitude')
+    plt.legend(loc = 'upper left')
+
 plt.title(title)
 plt.xlabel('time (s)')
-plt.legend(loc = 'upper left')
 plt.show()
