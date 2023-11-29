@@ -26,6 +26,12 @@ Loading from stdin can be helpful when using the json generator `gen.py`.
 python gen.py -h
 ```
 
+To visualize a labeled output, you can use `vis.py`.
+
+```sh
+python vis.py -h
+```
+
 # Simulation File Schema
 
 Each simulation is a single JSON file.
@@ -78,4 +84,26 @@ Round trips the clip to mp3 and back into (in-memory) wav.
 
 ```json
 ["mp3"]
+```
+
+# Visualizer File Schema
+
+The visualizer is used to create plots of a labeled output wav file.
+The labeled outputs are given by a single JSON file containing an array of events.
+Each event takes the form of an object with a `kind` field representing the label, as well as `start` and `duration` fields measured in seconds.
+Below is an example labeled events file containing two events.
+
+```json
+[
+    {
+        "kind": "dog-bark",
+        "start": 5.6495846184671,
+        "duration": 0.428
+    },
+    {
+        "kind": "cat-meow",
+        "start": 7.90988560426518,
+        "duration": 0.831
+    }
+]
 ```

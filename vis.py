@@ -33,9 +33,9 @@ if args.event is not None:
     start = clamp(round(event.get('start', 0) * sample_rate), 0, len(channel))
     stop = clamp(start + round(event.get('duration', 0) * sample_rate), start, len(channel))
     channels = [channel[start:stop] for channel in channels]
-    title = f'{args.source} - event {args.event} ({event["kind"]})'
+    title = f'{args.source} ({sample_rate}Hz) - event {args.event} ({event["kind"]})'
 else:
-    title = args.source
+    title = f'{args.source} ({sample_rate}Hz)'
 
 if args.spectrum:
     combined = np.average(channels, axis = 0)
