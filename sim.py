@@ -1,3 +1,4 @@
+import argparse
 import json
 import uuid
 import sys
@@ -7,13 +8,16 @@ from pydub import AudioSegment
 from typing import List, Any
 from util import load_sound
 
-if len(sys.argv) not in [2, 3]:
-    print(f'usage: {sys.argv[0]} [sim file] (out path)', file = sys.stderr)
-    sys.exit(1)
-if sys.argv[1] == '-':
+parser = argparse.ArgumentParser()
+parser.add_argument('sim')
+parser.add_argument('--out', default = 'out.wav')
+parser.add_argument('--sr', type = int)
+args = parser.parse_args()
+
+if args.sim == '-':
     sim = json.load(sys.stdin)
 else:
-    with open(sys.argv[1], 'r') as f:
+    with open(args.sim, 'r') as f:
         sim = json.load(f)
 
 def apply_effects(sound: AudioSegment, effects: List[Any]) -> AudioSegment:
@@ -47,4 +51,7 @@ for i, event in enumerate(sim['events']):
     res = res.overlay(sound, event.get('start', 0) * 1000)
 res = apply_effects(res, sim.get('effects', []))
 
-res.export(sys.argv[2] if 2 < len(sys.argv) else 'out.wav', format = 'wav')
+export_params = []
+if args.sr is not None:
+    export_params.extend(['-ar', str(args.sr)])
+res.export(args.out, format = 'wav', parameters = export_params)
