@@ -3,4 +3,5 @@
 *.json
 *.flac
 *.ipynb_checkpoints
-__pycache__
+__pycache__/
+dataset-partial/
