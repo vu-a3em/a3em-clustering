@@ -1,4 +1,6 @@
 *.wav
 *.mp3
 *.json
+*.flac
+*.ipynb_checkpoints
 __pycache__
