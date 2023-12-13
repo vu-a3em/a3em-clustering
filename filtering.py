@@ -55,16 +55,20 @@ class RNGFilter:
         return random.random() > self.p
 
 class FFTFilter:
-    def __init__(self, init_sample, fold_ratio):
+    def __init__(self, init_sample, fold_ratio, energy_ratio):
         self.background_freq = np.abs(np.fft.rfft(init_sample))
+        self.background_power = np.zeros(self.background_freq.shape)
         self.energy_thresh = 0
         self.fold_ratio = fold_ratio
+        self.energy_ratio = energy_ratio
     def step(self, sample):
         freq = np.abs(np.fft.rfft(sample))
-        energy = np.sum((freq - self.background_freq)**2)
-        keep = energy > self.energy_thresh
+        power = (freq - self.background_freq)**2
+        energy = np.sum(power * (power > self.background_power * self.energy_ratio))
+        keep = energy > self.energy_thresh * self.energy_ratio
 
         self.background_freq = (1 - self.fold_ratio) * self.background_freq + self.fold_ratio * freq
+        self.background_power = (1 - self.fold_ratio) * self.background_power + self.fold_ratio * power
         self.energy_thresh = (1 - self.fold_ratio) * self.energy_thresh + self.fold_ratio * energy
 
         return keep
@@ -73,30 +77,35 @@ if __name__ == '__main__':
     # make_filter = lambda s: ConstFilter(s, True) # ~90%
     # make_filter = lambda s: RNGFilter(s, 0.1) # ~81%
 
-    make_filter = lambda s: FFTFilter(s, 0.5)
+    for a in [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+        vs = []
+        for _ in range(8):
+            make_filter = lambda s: FFTFilter(s, a, 0.5)
 
-    dataset_root = 'dataset-partial'
-    tests = []
-    for label in os.listdir(dataset_root):
-        paths = []
-        for dirpath, dirnames, filenames in os.walk(f'{dataset_root}/{label}'):
-            paths.extend(f'{dirpath}/{x}' for x in filenames if x.endswith('.wav'))
-        if len(paths) > MAX_TESTS_PER_CLASS:
-            paths = random.sample(paths, MAX_TESTS_PER_CLASS)
-        assert len(paths) <= MAX_TESTS_PER_CLASS
-        tests.extend(paths)
+            dataset_root = 'dataset-partial'
+            tests = []
+            for label in os.listdir(dataset_root):
+                paths = []
+                for dirpath, dirnames, filenames in os.walk(f'{dataset_root}/{label}'):
+                    paths.extend(f'{dirpath}/{x}' for x in filenames if x.endswith('.wav'))
+                if len(paths) > MAX_TESTS_PER_CLASS:
+                    paths = random.sample(paths, MAX_TESTS_PER_CLASS)
+                assert len(paths) <= MAX_TESTS_PER_CLASS
+                tests.extend(paths)
 
-    total_correct = 0
-    total_count = 0
-    for test in tests:
-        segments = load_dataset_file(test)
-        if len(segments) == 0: continue
-        filter = make_filter(segments[0][0])
-        correct = 0
-        for segment, expected in segments:
-            got = filter.step(segment)
-            if got == expected: correct += 1
-        total_correct += correct
-        total_count += len(segments)
-        print(f'test {test}: {correct / len(segments):.4f}')
-    print(f'\navg: {total_correct / total_count:.4f}')
+            total_correct = 0
+            total_count = 0
+            for test in tests:
+                segments = load_dataset_file(test)
+                if len(segments) == 0: continue
+                filter = make_filter(segments[0][0])
+                correct = 0
+                for segment, expected in segments:
+                    got = filter.step(segment)
+                    if got == expected: correct += 1
+                total_correct += correct
+                total_count += len(segments)
+                # print(f'test {test}: {correct / len(segments):.4f}')
+            print(f'avg: {total_correct / total_count:.4f} ({a})')
+            vs.append(total_correct / total_count)
+        print(f'avg avg: {np.mean(vs)}')
