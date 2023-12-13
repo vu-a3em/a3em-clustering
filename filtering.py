@@ -1,19 +1,24 @@
 import numpy as np
 import librosa
 import random
+import sys
 import os
 
 DATASET_EVENT_DURATION_SECS = 2
 FILTERING_SLICE_DURATION_SECS = 1
-UNIFORM_SAMPLE_RATE = 8000
-MAX_TESTS_PER_CLASS = 5 # how many (random) examples to take (at most) from each class for testing the filters
+UNIFORM_SAMPLE_RATE = 20000
+MAX_TESTS_PER_CLASS = 20 # how many (random) examples to take (at most) from each class for testing the filters
 
 def load_dataset_file(path: str):
     p = path.rfind('.')
     if p >= 0: path = path[:p]
 
-    orig_samples, orig_sr = librosa.load(f'{path}.wav', sr = None)
-    new_samples = librosa.resample(orig_samples, orig_sr = orig_sr, target_sr = UNIFORM_SAMPLE_RATE)
+    try:
+        orig_samples, orig_sr = librosa.load(f'{path}.wav', sr = None)
+        new_samples = librosa.resample(orig_samples, orig_sr = orig_sr, target_sr = UNIFORM_SAMPLE_RATE)
+    except Exception as e:
+        print(f'failed to read {path}.wav', file = sys.stderr)
+        raise e
 
     raw_events = []
     with open(f'{path}.meta', 'r') as f:
@@ -37,13 +42,25 @@ def load_dataset_file(path: str):
         t += dt
     return res
 
+class ConstFilter:
+    def __init__(self, init_sample, v):
+        self.v = v
+    def step(self, sample):
+        return self.v
+
+class RNGFilter:
+    def __init__(self, init_sample, p):
+        self.p = p
+    def step(self, sample):
+        return random.random() > self.p
+
 class FFTFilter:
     def __init__(self, init_sample, fold_ratio):
-        self.background_freq = np.fft.fft(init_sample)
+        self.background_freq = np.abs(np.fft.rfft(init_sample))
         self.energy_thresh = 0
         self.fold_ratio = fold_ratio
     def step(self, sample):
-        freq = np.fft.fft(sample)
+        freq = np.abs(np.fft.rfft(sample))
         energy = np.sum((freq - self.background_freq)**2)
         keep = energy > self.energy_thresh
 
@@ -53,6 +70,11 @@ class FFTFilter:
         return keep
 
 if __name__ == '__main__':
+    # make_filter = lambda s: ConstFilter(s, True) # ~90%
+    # make_filter = lambda s: RNGFilter(s, 0.1) # ~81%
+
+    make_filter = lambda s: FFTFilter(s, 0.5)
+
     dataset_root = 'dataset-partial'
     tests = []
     for label in os.listdir(dataset_root):
@@ -69,7 +91,7 @@ if __name__ == '__main__':
     for test in tests:
         segments = load_dataset_file(test)
         if len(segments) == 0: continue
-        filter = FFTFilter(segments[0][0], 0.1)
+        filter = make_filter(segments[0][0])
         correct = 0
         for segment, expected in segments:
             got = filter.step(segment)
