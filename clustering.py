@@ -4,7 +4,7 @@ import torch
 import random
 
 import dataloader
-import vae_10 as vae
+import vae_11 as vae
 
 def mode(arr):
     counts = {}
@@ -88,8 +88,10 @@ if __name__ == '__main__':
     X_train, Y_train = prep_dataset({ k: v[:len(v) // 2] for k, v in raw_dataset.items() })
     X_eval, Y_eval = prep_dataset({ k: v[len(v) // 2:] for k, v in raw_dataset.items() })
 
+    n_clusters = 4000
+    # n_clusters = 50
     print(f'loaded {len(X_train)} training points and {len(X_eval)} eval points')
-    clusters, cluster_labels = train_cluster_classifier(X_train, Y_train, n_clusters = 4000)
+    clusters, cluster_labels = train_cluster_classifier(X_train, Y_train, n_clusters = n_clusters)
     print('trained cluster classifier:', clusters.shape, cluster_labels)
     print()
 

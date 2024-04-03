@@ -99,8 +99,30 @@ def get_dataset(max_files_per_class, max_events_per_class):
 #             dataset[k] = dataset[k][:max_events_per_class]
 #     return dataset
 
-def get_spectrogram(sample):
-    assert 1 <= len(sample.shape) <= 2
-    if len(sample.shape) == 2:
-        sample = np.average(sample, axis = 0)
-    return sig.spectrogram(sample, UNIFORM_SAMPLE_RATE)
+def get_spectrogram_normalized(sample, *, any_channel = False):
+    if len(sample.shape) == 2 and any_channel:
+        assert sample.shape[0] > 0
+        sample = random.choice(sample)
+    assert len(sample.shape) == 1
+
+    sample_offset = np.mean(sample)
+    sample -= sample_offset
+
+    sample_scale = np.sqrt(np.sum(sample**2))
+    if sample_scale <= 0:
+        sample_scale = 1
+    sample /= sample_scale
+
+    f, t, Sxx = sig.spectrogram(sample, UNIFORM_SAMPLE_RATE)
+    spectrum = np.log10(np.maximum(Sxx, 1e-20))
+    # spectrum = Sxx
+
+    spectrum_offset = 0 #np.min(spectrum)
+    spectrum -= spectrum_offset
+
+    spectrum_scale = 1 #np.mean(spectrum)
+    if spectrum_scale <= 0:
+        spectrum_scale = 1
+    spectrum /= spectrum_scale
+
+    return spectrum, (spectrum_scale, spectrum_offset, sample_scale, sample_offset)
