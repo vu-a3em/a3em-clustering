@@ -5,6 +5,7 @@ import sys
 import os
 
 import dataloader
+import effects
 import mfcc
 
 PADDING_MODE = 'replicate'
@@ -112,7 +113,19 @@ if __name__ == '__main__':
     parser.add_argument('--embedding-size', '-e', type = int, required = True)
     parser.add_argument('--output', '-o', type = str, required = True)
     parser.add_argument('--alpha', '-a', type = float, required = True)
+    parser.add_argument('--effects', type = str, default = '')
     args = parser.parse_args()
+
+    apply_effects = lambda x: x
+    if args.effects:
+        for effect in [x.strip() for x in args.effects.split('>')]:
+            print(f'adding effect: {effect}')
+            if effect == 'mp3':
+                apply_effects = lambda x: effects.mp3_roundtrip(apply_effects(x), dataloader.UNIFORM_SAMPLE_RATE)
+            else:
+                print(f'unknown effect type: "{effect}"', file = sys.stderr)
+                sys.exit(1)
+        print()
 
     assert args.alpha >= 0 and args.alpha <= 1
 
@@ -121,7 +134,7 @@ if __name__ == '__main__':
 
     encoder = Encoder(embedding_size = args.embedding_size).to(device)
     decoder = Decoder(embedding_size = args.embedding_size).to(device)
-    s = mfcc.mfcc_spectrogram_for_learning(next(iter(dataloader.get_dataset(1, 1).items()))[1][0], dataloader.UNIFORM_SAMPLE_RATE).shape
+    s = mfcc.mfcc_spectrogram_for_learning(apply_effects(next(iter(dataloader.get_dataset(1, 1).items()))[1][0]), dataloader.UNIFORM_SAMPLE_RATE).shape
     ss = decoder.forward(encoder.forward(torch.rand((1, *s)).to(device))[0]).shape[1:]
     assert ss == s, f'{s} -> {ss}'
 
@@ -135,7 +148,7 @@ if __name__ == '__main__':
         Y = []
         for i, (label, samples) in enumerate(data.items()):
             for sample in samples:
-                X.append(mfcc.mfcc_spectrogram_for_learning(sample, dataloader.UNIFORM_SAMPLE_RATE))
+                X.append(mfcc.mfcc_spectrogram_for_learning(apply_effects(sample), dataloader.UNIFORM_SAMPLE_RATE))
                 Y.append(i)
         return np.array(X, dtype = np.float32), np.array(Y, dtype = np.float32)
     raw_dataset = dataloader.get_dataset(None, 8192)
