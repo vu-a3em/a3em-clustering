@@ -5,6 +5,7 @@ import librosa
 import re
 import csv
 import torch
+import itertools
 
 import dataloader
 import mfcc
@@ -79,12 +80,6 @@ import mfcc_vae_1 as vae
 # MAX_CLUSTERS = 64
 # MAX_WEIGHT = 5.2
 # VOTE_THRESH = 0.01
-
-FILTER_TYPE = 'ClusterFilterAug3'
-FILTER_THRESH = 0.625
-MAX_CLUSTERS = 64
-MAX_WEIGHT = 5.2
-VOTE_THRESH = 0.01
 
 class EdansaDataloader:
     def __init__(self, path: str):
@@ -179,7 +174,13 @@ class ClusterFilterAug3:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input', type = str, required = True)
+    parser.add_argument('-w', '--weights', type = str, required = True)
     parser.add_argument('-s', '--seed', type = int, default = 0)
+    parser.add_argument('--filter-thresh', type = str, required = True)
+    parser.add_argument('--max-clusters', type = str, required = True)
+    parser.add_argument('--max-weight', type = str, required = True)
+    parser.add_argument('--vote-thresh', type = str, required = True)
+    parser.add_argument('-v', '--verbose', action = 'store_true')
     args = parser.parse_args()
 
     random.seed(args.seed)
@@ -188,7 +189,7 @@ if __name__ == '__main__':
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
     encoder = vae.Encoder(embedding_size = 16).to(device)
-    encoder.load_state_dict(torch.load('mfcc-untested-1/encoder-F16-A0.9-E256-L171.pt'))
+    encoder.load_state_dict(torch.load(args.weights))
     encoder.eval()
 
     def prep_sample(x):
@@ -199,23 +200,40 @@ if __name__ == '__main__':
             assert mean.shape == (1, encoder.embedding_size)
             return np.array(mean.cpu()).reshape(-1), np.array(logstd.exp().cpu()).reshape(-1)
 
-    filter = globals()[FILTER_TYPE](MAX_CLUSTERS, MAX_WEIGHT, encoder.embedding_size, FILTER_THRESH)
+    def parse_range(x, *, T: type = float):
+        x = x.split(':')
+        if len(x) == 1:
+            return [T(x[0])]
+        if len(x) == 3:
+            return sorted(set([T(y) for y in np.linspace(float(x[0]), float(x[1]), int(x[2]))]))
+        raise RuntimeError(f'unknown range syntax: "{x}"')
 
-    dataset = EdansaDataloader(args.input)
-    confusion = [[0, 0], [0, 0]]
-    for i, (clip, chunks, meta) in enumerate(dataset):
-        votes = [1 if filter.insert(*prep_sample(chunk)) else 0 for chunk in chunks]
-        vote_ratio = sum(votes) / len(votes)
+    for filter_thresh, max_clusters, max_weight, vote_thresh in itertools.product(parse_range(args.filter_thresh), parse_range(args.max_clusters, T = int), parse_range(args.max_weight), parse_range(args.vote_thresh)):
+        print(f'\nfilter_thresh={filter_thresh} max_clusters={max_clusters} max_weight={max_weight} vote_thresh={vote_thresh}')
 
-        keep = vote_ratio >= VOTE_THRESH
-        confusion[meta['is_event']][keep] += 1
-        ret = (confusion[True][True] + confusion[False][True]) / (i + 1)
-        ret_int = confusion[True][True] / max(1, confusion[True][True] + confusion[False][True])
-        dis_int = confusion[True][False] / max(1, confusion[True][False] + confusion[False][False])
-        print(f'{i:4} (ret {ret:.4f}) (ret int {ret_int:.4f}) (dis int {dis_int:.4f}) > {"keep   " if keep else "discard"} > { { k: meta[k] for k in ["Anth", "Bio", "Geo", "Sil"] } }')
+        filter = ClusterFilterAug3(max_clusters, max_weight, encoder.embedding_size, filter_thresh)
 
-    print('\nconfusion (actual x predicted):')
-    for row in confusion:
-        for col in row:
-            print(f'{col:4} ', end = '')
-        print()
+        dataset = EdansaDataloader(args.input)
+        confusion = [[0, 0], [0, 0]]
+        ret = lambda: (confusion[True][True] + confusion[False][True]) / max(1, confusion[False][False] + confusion[False][True] + confusion[True][False] + confusion[True][True])
+        ret_int = lambda: confusion[True][True] / max(1, confusion[True][True] + confusion[False][True])
+        dis_int = lambda: confusion[True][False] / max(1, confusion[True][False] + confusion[False][False])
+
+        for i, (clip, chunks, meta) in enumerate(dataset):
+            votes = [1 if filter.insert(*prep_sample(chunk)) else 0 for chunk in chunks]
+            vote_ratio = sum(votes) / len(votes)
+
+            keep = vote_ratio >= vote_thresh
+            confusion[meta['is_event']][keep] += 1
+
+            if args.verbose:
+                print(f'{i:4} (ret {ret():.4f}) (ret int {ret_int():.4f}) (dis int {dis_int():.4f}) > {"keep   " if keep else "discard"} > { { k: meta[k] for k in ["Anth", "Bio", "Geo", "Sil"] } }')
+
+        if args.verbose:
+            print('\nconfusion (actual x predicted):')
+            for row in confusion:
+                for col in row:
+                    print(f'{col:4} ', end = '')
+                print()
+        else:
+            print(f'---> (ret {ret():.4f}) (ret int {ret_int():.4f}) (dis int {dis_int():.4f})')

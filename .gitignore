@@ -7,7 +7,7 @@ __pycache__/
 dataset-partial/
 vae-*/
 untested-*/
-mfcc-untested-*/
+*-untested-*/
 new-dataset/
 *.csv
 *-dataset/
