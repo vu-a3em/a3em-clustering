@@ -17,6 +17,7 @@ def mp3_roundtrip(wav: np.ndarray, sr: int) -> np.ndarray:
         seg.export(f, format = 'wav')
         res = soundfile.read(f)
         res = (librosa.resample(res[0], orig_sr = res[1], target_sr = sr), sr)
+        res = (res[0].astype(wav.dtype), res[1])
 
         assert res[0].dtype == wav.dtype, f'{wav.dtype} -> {res[0].dtype}'
         assert res[0].shape == wav.shape, f'{wav.shape} -> {res[0].shape}'
