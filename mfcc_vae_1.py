@@ -121,7 +121,7 @@ if __name__ == '__main__':
         for effect in [x.strip() for x in args.effects.split('>')]:
             print(f'adding effect: {effect}')
             if effect == 'mp3':
-                apply_effects = lambda x: effects.mp3_roundtrip(apply_effects(x), dataloader.UNIFORM_SAMPLE_RATE)
+                apply_effects = (lambda f: lambda x: effects.mp3_roundtrip(f(x), dataloader.UNIFORM_SAMPLE_RATE))(apply_effects)
             else:
                 print(f'unknown effect type: "{effect}"', file = sys.stderr)
                 sys.exit(1)
