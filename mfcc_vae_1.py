@@ -151,8 +151,12 @@ if __name__ == '__main__':
                 X.append(mfcc.mfcc_spectrogram_for_learning(apply_effects(sample), dataloader.UNIFORM_SAMPLE_RATE))
                 Y.append(i)
         return np.array(X, dtype = np.float32), np.array(Y, dtype = np.float32)
+
+    print('loading dataset...')
     raw_dataset = dataloader.get_dataset(None, 8192)
     # raw_dataset = dataloader.get_dataset(5, 50)
+
+    print('prepping dataset...')
     X_train, Y_train = prep_dataset({ k: v[:len(v) // 2] for k, v in raw_dataset.items() })
     X_eval, Y_eval = prep_dataset({ k: v[len(v) // 2:] for k, v in raw_dataset.items() })
 
