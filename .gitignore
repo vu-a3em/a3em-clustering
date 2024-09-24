@@ -12,3 +12,4 @@ new-dataset/
 *.csv
 *-dataset/
 EDANSA-2019/
+*.pt
