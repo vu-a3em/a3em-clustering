@@ -15,6 +15,10 @@ class Encoder(torch.nn.Module):
         super().__init__()
         self.embedding_size = embedding_size
 
+        self.quant = torch.quantization.QuantStub()
+        self.dequant_mean = torch.quantization.DeQuantStub()
+        self.dequant_logstd = torch.quantization.DeQuantStub()
+
         self.convolutions = torch.nn.ModuleList([
             torch.nn.Conv2d(1, 64, kernel_size = (3, 3), stride = 2),
             torch.nn.Conv2d(64, 128, kernel_size = (1, 1)),
@@ -49,6 +53,7 @@ class Encoder(torch.nn.Module):
         self.mean = torch.nn.Linear(32, embedding_size)
         self.logstd = torch.nn.Linear(32, embedding_size)
     def forward(self, x):
+        x = self.quant(x)
         assert x.shape[1:] == (65, 65), f'{x.shape}'
         relu = torch.nn.LeakyReLU(0.01)
 
@@ -60,7 +65,7 @@ class Encoder(torch.nn.Module):
         for step in self.linears:
             x = relu(step(x))
 
-        return self.mean(x), self.logstd(x)
+        return self.dequant_mean(self.mean(x)), self.dequant_logstd(self.logstd(x))
 
 class Decoder(torch.nn.Module):
     def __init__(self, *, embedding_size):
