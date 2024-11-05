@@ -13,3 +13,6 @@ new-dataset/
 *-dataset/
 EDANSA-2019/
 *.pt
+model.onnx
+model.pb/
+model.tflite
