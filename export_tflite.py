@@ -55,6 +55,9 @@ onnx_tf.backend.prepare(onnx_model).export_graph(TF_MODEL_PATH)
 
 # convert tensorflow model to tf-lite
 
-tflite_model = tf.lite.TFLiteConverter.from_saved_model(TF_MODEL_PATH).convert()
+converter = tf.lite.TFLiteConverter.from_saved_model(TF_MODEL_PATH)
+converter.optimizations.add(tf.lite.Optimize.DEFAULT)
+tflite_model = converter.convert()
+
 with open(TFLITE_MODEL_PATH, 'wb') as f:
     f.write(tflite_model)
