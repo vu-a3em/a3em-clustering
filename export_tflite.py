@@ -5,6 +5,7 @@ import dataloader
 import mfcc
 import onnx_tf
 import tensorflow as tf
+import numpy as np
 
 ONNX_MODEL_PATH = 'model.onnx'
 TF_MODEL_PATH = 'model.pb'
@@ -55,8 +56,30 @@ onnx_tf.backend.prepare(onnx_model).export_graph(TF_MODEL_PATH)
 
 # convert tensorflow model to tf-lite
 
+def prep_dataset(data):
+    X = []
+    Y = []
+    for i, (label, samples) in enumerate(data.items()):
+        for sample in samples:
+            X.append(mfcc.mfcc_spectrogram_for_learning(sample, dataloader.UNIFORM_SAMPLE_RATE))
+            Y.append(i)
+    return np.array(X, dtype = np.float32), np.array(Y, dtype = np.float32)
+
+print('loading dataset...')
+raw_dataset = dataloader.get_dataset(None, 8192)
+
+print('processing dataset for quantization metrics...')
+def preprocess_stream(raw):
+    for label, samples in raw.items():
+        for sample in samples:
+            yield [mfcc.mfcc_spectrogram_for_learning(sample, dataloader.UNIFORM_SAMPLE_RATE).astype(np.float32)]
+
 converter = tf.lite.TFLiteConverter.from_saved_model(TF_MODEL_PATH)
-converter.optimizations.add(tf.lite.Optimize.DEFAULT)
+converter.optimizations = [tf.lite.Optimize.DEFAULT]
+converter.target_spec.supported_types = [tf.int8]
+converter.inference_input_type = tf.float32
+converter.inference_output_type = tf.float32
+converter.representative_dataset = lambda: preprocess_stream(raw_dataset)
 tflite_model = converter.convert()
 
 with open(TFLITE_MODEL_PATH, 'wb') as f:
