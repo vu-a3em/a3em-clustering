@@ -131,7 +131,7 @@ if __name__ == '__main__':
         print()
 
         confusion = test_cluster_classifier(clusters, cluster_labels, X_eval, Y_eval, len(raw_dataset))
-        print(f'eval accuracy: {np.einsum("ii", confusion) / len(X_eval):.2f} ({round(np.einsum("ii", confusion))} / {len(X_eval)}) -- confusion:')
+        print(f'eval accuracy: {np.einsum("ii", confusion) / len(X_eval):.2f} ({round(np.einsum("ii", confusion))} / {len(X_eval)})')
         print('confusion:')
         print_confusion_matrix(confusion, classes_ordered)
         print()
