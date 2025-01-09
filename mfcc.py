@@ -12,7 +12,7 @@ def low_pass_filter(audio, *, sample_rate, band_limit = None):
     return np.fft.irfft(F, n = audio.size).real
 
 def normalize_audio(audio):
-    assert len(audio.shape) == 1
+    assert len(audio.shape) == 1, audio.shape
     s = np.max(np.abs(audio))
     if s == 0: s = 1
     return audio / s
