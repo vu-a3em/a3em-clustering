@@ -89,7 +89,7 @@ if __name__ == '__main__':
     parser.add_argument('--clip-duration', type = float, default = 30)
     parser.add_argument('--clips', type = int, default = 2 * 60 * 24)
     parser.add_argument('--bg-change-prob', type = float, default = 0.1)
-    parser.add_argument('--event-prob', type = float, default = 0.2)
+    parser.add_argument('--event-prob', type = float, default = 0.25)
     parser.add_argument('--event-freqs', type = str, nargs = '*', default = [])
     parser.add_argument('--max-clusters', type = int, default = 64)
     parser.add_argument('--max-weight', type = float, default = 4.0)
@@ -115,8 +115,11 @@ if __name__ == '__main__':
     print(f'backgrounds: {({ k: len(v) for k,v in backgrounds.items() })}')
     print(f'events: {({ k: len(v) for k,v in events.items() })}\n')
 
-    event_freqs = { x[:x.index(':')]: int(x[x.index(':')+1:]) for x in args.event_freqs }
-    event_freqs = { k: v for k, v in event_freqs.items() if v >= 1 }
+    event_freqs = { x[:x.index(':')]: float(x[x.index(':')+1:]) for x in args.event_freqs }
+    if '*' in event_freqs:
+        event_freqs = { **event_freqs, **{ x: event_freqs['*'] for x in events.keys() if x not in event_freqs } }
+        del event_freqs['*']
+    event_freqs = { k: v for k, v in event_freqs.items() if v > 0 }
     if len(event_freqs) == 0: event_freqs = { x: 1 for x in events.keys() }
     for x in event_freqs.keys():
         if x not in events:
@@ -166,7 +169,7 @@ if __name__ == '__main__':
         if vote_retain(clip): output_events[event_class] += 1
 
     for event in sorted(input_events.keys(), key = lambda x: -input_events[x]):
-        print(f'{str(event):>40}: {input_events[event]:>5} -> {output_events[event]:>5} ({100 * output_events[event] / input_events[event]:>5.1f}%)')
+        print(f'{str(event):>40}: {input_events[event]:>5} -> {output_events[event]:>5} ({100 * output_events[event] / input_events[event] if input_events[event] != 0 else 0:>5.1f}%)')
 
     if args.audio_out is not None:
         soundfile.write(args.audio_out, np.concatenate(clips), samplerate = dataloader.UNIFORM_SAMPLE_RATE, format = 'WAV')
