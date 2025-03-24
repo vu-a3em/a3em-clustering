@@ -50,7 +50,7 @@ class ClusterFilterAug3:
             ])
             return True
 
-def load_sounds(path: str, *, min_length: float = 0, max_length: float = math.inf, mult_length: float = None) -> Dict[str, np.ndarray]:
+def load_sounds(path: str, *, min_length: float = 0, max_length: float = math.inf, mult_length: float = None, max_silence_ratio: float = None) -> Dict[str, np.ndarray]:
     res = { cls: [] for cls in sorted(os.listdir(path)) }
     for cls, entries in res.items():
         for file in sorted(os.listdir(f'{path}/{cls}')):
@@ -67,6 +67,10 @@ def load_sounds(path: str, *, min_length: float = 0, max_length: float = math.in
                 print(f'  omitting {path}/{cls}/{file} -- too long ({len(clip) / sr:0.2f}s > {max_length:0.2f}s)')
                 continue
 
+            if max_silence_ratio is not None and np.mean(clip == 0) > max_silence_ratio:
+                print(f'  omitting {path}/{cls}/{file} -- too much silence')
+                continue
+
             entries.append(clip)
     return { k: v for k,v in res.items() if len(v) > 0 }
 
@@ -81,6 +85,14 @@ def random_extend(x: np.ndarray, s: int) -> np.ndarray:
     res[t:t+x.shape[0]] = x
     return res
 
+def create_fade(size, *, fade_duration, sr):
+    t = min(round(fade_duration * sr), round(size / 4))
+    return np.concat([
+        np.linspace(0, 1, t),
+        np.ones((size - 2 * t,)),
+        np.linspace(1, 0, t),
+    ])
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--events', type = str, nargs = '+', required = True)
@@ -91,11 +103,13 @@ if __name__ == '__main__':
     parser.add_argument('--bg-change-prob', type = float, default = 0.1)
     parser.add_argument('--event-prob', type = float, default = 0.25)
     parser.add_argument('--event-freqs', type = str, nargs = '*', default = [])
-    parser.add_argument('--max-clusters', type = int, default = 64)
-    parser.add_argument('--max-weight', type = float, default = 4.0)
-    parser.add_argument('--filter-thresh', type = float, default = 0.5)
+    parser.add_argument('--max-clusters', type = int, default = 1024)
+    parser.add_argument('--max-weight', type = float, default = 128.0)
+    parser.add_argument('--filter-thresh', type = float, default = 0.3)
     parser.add_argument('--vote-thresh', type = float, default = 0.0)
     parser.add_argument('--audio-out', type = str)
+    parser.add_argument('--fade-duration', type = float, default = 2)
+    parser.add_argument('--max-silence-ratio', type = float, default = 0.1)
     args = parser.parse_args()
 
     if args.seed is not None: random.seed(args.seed)
@@ -108,8 +122,8 @@ if __name__ == '__main__':
     encoder.eval()
 
     print('loading sounds...')
-    backgrounds = dict(sum((list(load_sounds(path, min_length = dataloader.SAMPLE_DURATION_SECS, mult_length = dataloader.SAMPLE_DURATION_SECS).items()) for path in sorted(args.backgrounds)), start = []))
-    events = dict(sum((list(load_sounds(path, max_length = args.clip_duration).items()) for path in sorted(args.events)), start = []))
+    backgrounds = dict(sum((list(load_sounds(path, min_length = dataloader.SAMPLE_DURATION_SECS, mult_length = dataloader.SAMPLE_DURATION_SECS, max_silence_ratio = args.max_silence_ratio).items()) for path in sorted(args.backgrounds)), start = []))
+    events = dict(sum((list(load_sounds(path, max_length = args.clip_duration, max_silence_ratio = args.max_silence_ratio).items()) for path in sorted(args.events)), start = []))
     print('loading complete\n')
 
     print(f'backgrounds: {({ k: len(v) for k,v in backgrounds.items() })}')
@@ -134,6 +148,8 @@ if __name__ == '__main__':
             p += weight / t
             if r < p: break
         return e
+
+    print(f'event freqs: {event_freqs}\n')
 
     f = ClusterFilterAug3(args.max_clusters, args.max_weight, encoder.embedding_size, args.filter_thresh)
     def vote_retain(x: np.ndarray) -> bool:
@@ -161,7 +177,9 @@ if __name__ == '__main__':
         event_class = None
         if random.random() < args.event_prob:
             event_class = pick_event()
-            event = random_contract(random_extend(random.choice(events[event_class]), clip_len), clip_len)
+            event = random.choice(events[event_class])
+            event = event * create_fade(len(event), fade_duration = args.fade_duration, sr = dataloader.UNIFORM_SAMPLE_RATE)
+            event = random_contract(random_extend(event, clip_len), clip_len)
             clip += event
 
         clips.append(clip)
@@ -172,4 +190,4 @@ if __name__ == '__main__':
         print(f'{str(event):>40}: {input_events[event]:>5} -> {output_events[event]:>5} ({100 * output_events[event] / input_events[event] if input_events[event] != 0 else 0:>5.1f}%)')
 
     if args.audio_out is not None:
-        soundfile.write(args.audio_out, np.concatenate(clips), samplerate = dataloader.UNIFORM_SAMPLE_RATE, format = 'WAV')
+        soundfile.write(args.audio_out, np.concatenate(clips), samplerate = dataloader.UNIFORM_SAMPLE_RATE, format = args.audio_out[args.audio_out.rfind('.')+1:].upper())

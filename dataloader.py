@@ -6,11 +6,13 @@ import os
 import scipy.signal as sig
 import numpy as np
 
+from typing import Optional
+
 DATASET_EVENT_DURATION_SECS = 2
 SAMPLE_DURATION_SECS = 1
 UNIFORM_SAMPLE_RATE = 8000 # 20000
 
-def load_dataset_file(path: str):
+def load_dataset_file(path: str, *, sample_duration: int = SAMPLE_DURATION_SECS):
     p = path.rfind('.')
     if p >= 0: path = path[:p]
 
@@ -35,7 +37,7 @@ def load_dataset_file(path: str):
 
     res = []
     t = 0
-    dt = round(SAMPLE_DURATION_SECS * UNIFORM_SAMPLE_RATE)
+    dt = round(sample_duration * UNIFORM_SAMPLE_RATE)
     edt = round(DATASET_EVENT_DURATION_SECS * UNIFORM_SAMPLE_RATE)
     while True:
         if t + dt > new_samples.shape[0]: break
@@ -48,7 +50,7 @@ def load_dataset_file(path: str):
         t += dt
     return res
 
-def get_dataset(max_files_per_class, max_events_per_class):
+def get_dataset(max_files_per_class: Optional[int], max_events_per_class: Optional[int], *, sample_duration: int = SAMPLE_DURATION_SECS):
     dataset = {}
     root = 'dataset-partial'
     for cls in os.listdir(root):
@@ -61,7 +63,7 @@ def get_dataset(max_files_per_class, max_events_per_class):
         for i, file in enumerate(files):
             if max_files_per_class is not None and i >= max_files_per_class: break
             sub_dataset = {}
-            for label, data in load_dataset_file(file):
+            for label, data in load_dataset_file(file, sample_duration = sample_duration):
                 if label not in sub_dataset:
                     sub_dataset[label] = []
                 sub_dataset[label].append(data)
