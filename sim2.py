@@ -12,6 +12,11 @@ import numpy as np
 
 from typing import Dict, Any
 
+QUIET = False
+def qprint(*args, **kwargs):
+    if not QUIET:
+        print(*args, **kwargs)
+
 class ClusterFilterAug3:
     def __init__(self, max_clusters, max_weight, embedding_size, thresh):
         self.means = np.zeros((max_clusters, embedding_size))
@@ -61,14 +66,14 @@ def load_sounds(path: str, *, min_length: float = 0, max_length: float = math.in
                 assert len(clip) % (mult_length * sr) == 0, f'{path}/{cls}/{file} not a multiple of {mult_length}s'
 
             if len(clip) < min_length * sr:
-                print(f'  omitting {path}/{cls}/{file} -- too short ({len(clip) / sr:0.2f}s < {min_length:0.2f}s)')
+                qprint(f'  omitting {path}/{cls}/{file} -- too short ({len(clip) / sr:0.2f}s < {min_length:0.2f}s)')
                 continue
             if len(clip) > max_length * sr:
-                print(f'  omitting {path}/{cls}/{file} -- too long ({len(clip) / sr:0.2f}s > {max_length:0.2f}s)')
+                qprint(f'  omitting {path}/{cls}/{file} -- too long ({len(clip) / sr:0.2f}s > {max_length:0.2f}s)')
                 continue
 
             if max_silence_ratio is not None and np.mean(clip == 0) > max_silence_ratio:
-                print(f'  omitting {path}/{cls}/{file} -- too much silence')
+                qprint(f'  omitting {path}/{cls}/{file} -- too much silence')
                 continue
 
             entries.append(clip)
@@ -103,31 +108,33 @@ if __name__ == '__main__':
     parser.add_argument('--bg-change-prob', type = float, default = 0.1)
     parser.add_argument('--event-prob', type = float, default = 0.25)
     parser.add_argument('--event-freqs', type = str, nargs = '*', default = [])
-    parser.add_argument('--max-clusters', type = int, default = 1024)
-    parser.add_argument('--max-weight', type = float, default = 128.0)
-    parser.add_argument('--filter-thresh', type = float, default = 0.3)
+    parser.add_argument('--max-clusters', type = int, default = 256)
+    parser.add_argument('--max-weight', type = float, default = 1024.0)
+    parser.add_argument('--filter-thresh', type = float, default = 0.2)
     parser.add_argument('--vote-thresh', type = float, default = 0.0)
     parser.add_argument('--audio-out', type = str)
-    parser.add_argument('--fade-duration', type = float, default = 2)
+    parser.add_argument('--fade-duration', type = float, default = 1)
     parser.add_argument('--max-silence-ratio', type = float, default = 0.1)
+    parser.add_argument('--quiet', action = 'store_true')
     args = parser.parse_args()
 
     if args.seed is not None: random.seed(args.seed)
+    globals()['QUIET'] = True
 
-    print(f'gpu enabled: {torch.cuda.is_available()}\n')
+    qprint(f'gpu enabled: {torch.cuda.is_available()}\n')
     device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 
     encoder = vae.Encoder(embedding_size = 16).to(device)
     encoder.load_state_dict(torch.load('mfcc-untested-1/encoder-F16-A0.9-E256-L171.pt', weights_only = True))
     encoder.eval()
 
-    print('loading sounds...')
+    qprint('loading sounds...')
     backgrounds = dict(sum((list(load_sounds(path, min_length = dataloader.SAMPLE_DURATION_SECS, mult_length = dataloader.SAMPLE_DURATION_SECS, max_silence_ratio = args.max_silence_ratio).items()) for path in sorted(args.backgrounds)), start = []))
     events = dict(sum((list(load_sounds(path, max_length = args.clip_duration, max_silence_ratio = args.max_silence_ratio).items()) for path in sorted(args.events)), start = []))
-    print('loading complete\n')
+    qprint('loading complete\n')
 
-    print(f'backgrounds: {({ k: len(v) for k,v in backgrounds.items() })}')
-    print(f'events: {({ k: len(v) for k,v in events.items() })}\n')
+    qprint(f'backgrounds: {({ k: len(v) for k,v in backgrounds.items() })}')
+    qprint(f'events: {({ k: len(v) for k,v in events.items() })}\n')
 
     event_freqs = { x[:x.index(':')]: float(x[x.index(':')+1:]) for x in args.event_freqs }
     if '*' in event_freqs:
@@ -150,6 +157,9 @@ if __name__ == '__main__':
         return e
 
     print(f'event freqs: {event_freqs}\n')
+
+    for x in [x for x in events.keys() if x not in event_freqs]:
+        del events[x]
 
     f = ClusterFilterAug3(args.max_clusters, args.max_weight, encoder.embedding_size, args.filter_thresh)
     def vote_retain(x: np.ndarray) -> bool:
