@@ -98,7 +98,41 @@ def create_fade(size, *, fade_duration, sr):
         np.linspace(1, 0, t),
     ])
 
+def energy_peak(x: np.array, *, radius: int):
+    kernel = np.concat([
+        np.linspace(0, 1, radius + 2)[1:-1],
+        [1],
+        np.linspace(1, 0, radius + 2)[1:-1],
+    ])
+    return np.argmax(np.convolve(x**2, kernel, mode = 'same'))
+
+def energy_chunks(x: np.array, *, size: int, radius: int, count: int):
+    res = []
+    x = np.copy(x)
+    half = size // 2
+    e = np.concat([np.zeros((half,)), x, np.zeros((half,))])
+    for _ in range(count):
+        p = energy_peak(x, radius = radius)
+        res.append(e[p : p + size])
+        x[max(0, p - half) : min(len(x), p - half + size)] = 0
+    return np.array(res)
+
+def chunks(x: np.array, *, size: int, overlaps: int) -> np.array:
+    assert len(x) >= size
+    p = 0
+    s = round(size / (1 + overlaps))
+    res = []
+    while p + size <= len(x):
+        res.append(x[p:p+size])
+        p += s
+    return np.array(res)
+
 if __name__ == '__main__':
+    # x = np.array([1,3,2,3,2,1,4,2,3,1,24,1000,23,21,2,3,1,3,2,1,3])
+    # for c in energy_chunks(x, size = 8, radius = 5, count = 3):
+    #     print(c)
+    # os.abort()
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--events', type = str, nargs = '+', required = True)
     parser.add_argument('--backgrounds', type = str, nargs = '+', required = True)
@@ -115,6 +149,9 @@ if __name__ == '__main__':
     parser.add_argument('--audio-out', type = str)
     parser.add_argument('--fade-duration', type = float, default = 1)
     parser.add_argument('--max-silence-ratio', type = float, default = 0.1)
+    parser.add_argument('--radius', type = int, default = 16)
+    parser.add_argument('--chunks', type = int, default = 4)
+    parser.add_argument('--background-scale', type = float, default = 1.0)
     parser.add_argument('--quiet', action = 'store_true')
     args = parser.parse_args()
 
@@ -163,10 +200,9 @@ if __name__ == '__main__':
 
     f = ClusterFilterAug3(args.max_clusters, args.max_weight, encoder.embedding_size, args.filter_thresh)
     def vote_retain(x: np.ndarray) -> bool:
-        segs = len(x) / (dataloader.UNIFORM_SAMPLE_RATE * dataloader.SAMPLE_DURATION_SECS)
-        assert segs == float(int(segs)), segs
         votes = []
-        for seg in np.split(x, segs):
+        # for seg in chunks(x, size = dataloader.UNIFORM_SAMPLE_RATE * dataloader.SAMPLE_DURATION_SECS, overlaps = args.overlaps):
+        for seg in energy_chunks(x, size = dataloader.UNIFORM_SAMPLE_RATE * dataloader.SAMPLE_DURATION_SECS, count = args.chunks, radius = args.radius):
             with torch.no_grad():
                 mean, std = encoder.forward(torch.tensor(mfcc.mfcc_spectrogram_for_learning(seg, dataloader.UNIFORM_SAMPLE_RATE)[np.newaxis,:], dtype = torch.float).to(device))
                 votes.append(f.insert(mean.cpu().numpy().squeeze(), std.cpu().numpy().squeeze()))
@@ -183,6 +219,8 @@ if __name__ == '__main__':
         background = random.choice(backgrounds[background_class])
         clip = np.tile(background, math.ceil(clip_len / len(background)))[:clip_len] # avoid random_contract to prevent transitions in inference chunks
         assert clip.shape == (clip_len,), clip.shape
+
+        clip *= args.background_scale
 
         event_class = None
         if random.random() < args.event_prob:
