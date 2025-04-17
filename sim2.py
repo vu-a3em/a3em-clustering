@@ -152,18 +152,29 @@ if __name__ == '__main__':
     parser.add_argument('--radius', type = int, default = 16)
     parser.add_argument('--chunks', type = int, default = 4)
     parser.add_argument('--background-scale', type = float, default = 1.0)
+    parser.add_argument('--iterations', type = int, default = 1)
+    parser.add_argument('--embedding_size', type = int, default = 16)
+    parser.add_argument('--quantized', action = 'store_true')
     parser.add_argument('--quiet', action = 'store_true')
     args = parser.parse_args()
 
+    assert args.iterations >= 1
     if args.seed is not None: random.seed(args.seed)
     globals()['QUIET'] = True
 
-    qprint(f'gpu enabled: {torch.cuda.is_available()}\n')
-    device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    if args.quantized:
+        device = 'cpu'
+        print(f'using quantized model on device "{device}"\n')
 
-    encoder = vae.Encoder(embedding_size = 16).to(device)
-    encoder.load_state_dict(torch.load('mfcc-untested-1/encoder-F16-A0.9-E256-L171.pt', weights_only = True))
-    encoder.eval()
+        encoder = torch.jit.load('portable-model-i8.pt').to(device)
+        encoder.eval()
+    else:
+        device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+        print(f'using standard model on device "{device}"\n')
+
+        encoder = vae.Encoder(embedding_size = args.embedding_size).to(device)
+        encoder.load_state_dict(torch.load('mfcc-untested-1/encoder-F16-A0.9-E256-L171.pt', weights_only = True))
+        encoder.eval()
 
     qprint('loading sounds...')
     backgrounds = dict(sum((list(load_sounds(path, min_length = dataloader.SAMPLE_DURATION_SECS, mult_length = dataloader.SAMPLE_DURATION_SECS, max_silence_ratio = args.max_silence_ratio).items()) for path in sorted(args.backgrounds)), start = []))
@@ -198,44 +209,45 @@ if __name__ == '__main__':
     for x in [x for x in events.keys() if x not in event_freqs]:
         del events[x]
 
-    f = ClusterFilterAug3(args.max_clusters, args.max_weight, encoder.embedding_size, args.filter_thresh)
-    def vote_retain(x: np.ndarray) -> bool:
-        votes = []
-        # for seg in chunks(x, size = dataloader.UNIFORM_SAMPLE_RATE * dataloader.SAMPLE_DURATION_SECS, overlaps = args.overlaps):
-        for seg in energy_chunks(x, size = dataloader.UNIFORM_SAMPLE_RATE * dataloader.SAMPLE_DURATION_SECS, count = args.chunks, radius = args.radius):
-            with torch.no_grad():
-                mean, std = encoder.forward(torch.tensor(mfcc.mfcc_spectrogram_for_learning(seg, dataloader.UNIFORM_SAMPLE_RATE)[np.newaxis,:], dtype = torch.float).to(device))
-                votes.append(f.insert(mean.cpu().numpy().squeeze(), std.cpu().numpy().squeeze()))
-        return np.mean(votes) > args.vote_thresh
-
     clips = []
     input_events = { x: 0 for x in [None] + list(event_freqs.keys()) }
     output_events = input_events.copy()
     background_class = None
     clip_len = dataloader.UNIFORM_SAMPLE_RATE * args.clip_duration
-    for i in range(args.clips):
-        if background_class is None or random.random() < args.bg_change_prob:
-            background_class = random.choice(sorted(backgrounds.keys()))
-        background = random.choice(backgrounds[background_class])
-        clip = np.tile(background, math.ceil(clip_len / len(background)))[:clip_len] # avoid random_contract to prevent transitions in inference chunks
-        assert clip.shape == (clip_len,), clip.shape
+    for i in range(args.iterations):
+        f = ClusterFilterAug3(args.max_clusters, args.max_weight, args.embedding_size, args.filter_thresh)
+        def vote_retain(x: np.ndarray) -> bool:
+            votes = []
+            for seg in energy_chunks(x, size = dataloader.UNIFORM_SAMPLE_RATE * dataloader.SAMPLE_DURATION_SECS, count = args.chunks, radius = args.radius):
+                with torch.no_grad():
+                    mean, std = encoder.forward(torch.tensor(mfcc.mfcc_spectrogram_for_learning(seg, dataloader.UNIFORM_SAMPLE_RATE)[np.newaxis,:], dtype = torch.float).to(device))
+                    votes.append(f.insert(mean.cpu().numpy().squeeze(), std.cpu().numpy().squeeze()))
+            return np.mean(votes) > args.vote_thresh
 
-        clip *= args.background_scale
+        for i in range(args.clips):
+            if background_class is None or random.random() < args.bg_change_prob:
+                background_class = random.choice(sorted(backgrounds.keys()))
+            background = random.choice(backgrounds[background_class])
+            clip = np.tile(background, math.ceil(clip_len / len(background)))[:clip_len] # avoid random_contract to prevent transitions in inference chunks
+            assert clip.shape == (clip_len,), clip.shape
 
-        event_class = None
-        if random.random() < args.event_prob:
-            event_class = pick_event()
-            event = random.choice(events[event_class])
-            event = event * create_fade(len(event), fade_duration = args.fade_duration, sr = dataloader.UNIFORM_SAMPLE_RATE)
-            event = random_contract(random_extend(event, clip_len), clip_len)
-            clip += event
+            clip *= args.background_scale
 
-        clips.append(clip)
-        input_events[event_class] += 1
-        if vote_retain(clip): output_events[event_class] += 1
+            event_class = None
+            if random.random() < args.event_prob:
+                event_class = pick_event()
+                event = random.choice(events[event_class])
+                event = event * create_fade(len(event), fade_duration = args.fade_duration, sr = dataloader.UNIFORM_SAMPLE_RATE)
+                event = random_contract(random_extend(event, clip_len), clip_len)
+                clip += event
+
+            if args.audio_out is not None: clips.append(clip)
+            input_events[event_class] += 1
+            if vote_retain(clip): output_events[event_class] += 1
+
+        if args.audio_out is not None:
+            p = args.audio_out if args.iterations == 1 else f'{args.audio_out[:args.audio_out.rfind(".")]}-{i}.{args.audio_out[args.audio_out.rfind(".")+1:]}'
+            soundfile.write(args.audio_out, np.concatenate(clips), samplerate = dataloader.UNIFORM_SAMPLE_RATE, format = args.audio_out[args.audio_out.rfind('.')+1:].upper())
 
     for event in sorted(input_events.keys(), key = lambda x: -input_events[x]):
         print(f'{str(event):>40}: {input_events[event]:>5} -> {output_events[event]:>5} ({100 * output_events[event] / input_events[event] if input_events[event] != 0 else 0:>5.1f}%)')
-
-    if args.audio_out is not None:
-        soundfile.write(args.audio_out, np.concatenate(clips), samplerate = dataloader.UNIFORM_SAMPLE_RATE, format = args.audio_out[args.audio_out.rfind('.')+1:].upper())

@@ -26,21 +26,21 @@ MAX_CLUSTERS = [
 MAX_WEIGHT = [
     # 8,
     # 16,
-    32,
+    # 32,
     64,
     128,
     256,
-    512,
+    # 512,
 ]
 FILTER_THRESH = [
     0.1,
     0.15,
     0.2,
     0.25,
-    0.3,
-    0.35,
-    0.4,
-    0.45,
+    # 0.3,
+    # 0.35,
+    # 0.4,
+    # 0.45,
     # 0.5,
     # 0.55,
     # 0.6,
@@ -49,13 +49,13 @@ FILTER_THRESH = [
 ]
 VOTE_THRESH = [
     0.0,
-    0.2,
+    # 0.2,
     0.3,
 ]
 RADIUS = [
-    8,
+    # 8,
     64,
-    256,
+    # 256,
 ]
 CHUNKS = [
     4,
@@ -73,6 +73,7 @@ if __name__ == '__main__':
     parser.add_argument('--jobs', type = int, required = True)
     parser.add_argument('--hours', type = float, required = True)
     parser.add_argument('--output', type = str, required = True)
+    parser.add_argument('--quantized', action = 'store_true')
     args = parser.parse_args()
 
     assert args.jobs >= 1
@@ -107,6 +108,7 @@ if __name__ == '__main__':
                     '--radius', str(info[5]),
                     '--chunks', str(info[6]),
                     '--background-scale', str(info[7]),
+                    *(['--quantized'] if args.quantized else []),
                 ], stdout = f, stderr = f)
     workers = [threading.Thread(target = worker) for _ in range(args.jobs)]
     for w in workers: w.start()
