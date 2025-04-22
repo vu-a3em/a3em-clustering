@@ -5,7 +5,7 @@ import threading
 import os
 
 EVENTS = [
-    '/home/devin/Downloads/dog-events/',
+    # '/home/devin/Downloads/dog-events/',
     '/home/devin/Downloads/misc-events/',
 ]
 BACKGROUNDS = [
@@ -18,28 +18,32 @@ EVENT_FREQS = [
     [0, 'Frog:8', 'Rooster:1', 'Aircraft:1'],
 ]
 MAX_CLUSTERS = [
+    # 8,
+    16,
+    24,
     32,
     64,
-    # 128,
+    128,
     # 256,
 ]
 MAX_WEIGHT = [
     # 8,
-    # 16,
-    # 32,
+    16,
+    32,
     64,
     128,
     256,
-    # 512,
+    512,
+    # 1024,
 ]
 FILTER_THRESH = [
     0.1,
     0.15,
     0.2,
     0.25,
-    # 0.3,
-    # 0.35,
-    # 0.4,
+    0.3,
+    0.35,
+    0.4,
     # 0.45,
     # 0.5,
     # 0.55,
@@ -71,6 +75,7 @@ BACKGROUND_SCALE = [
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--jobs', type = int, required = True)
+    parser.add_argument('--iterations', type = int, default = 1)
     parser.add_argument('--hours', type = float, required = True)
     parser.add_argument('--output', type = str, required = True)
     parser.add_argument('--quantized', action = 'store_true')
@@ -99,6 +104,7 @@ if __name__ == '__main__':
                     '--events', *EVENTS,
                     '--backgrounds', *BACKGROUNDS,
                     '--clips', str(round(2 * 60 * args.hours)),
+                    '--iterations', str(args.iterations),
                     '--event-prob', '1.0',
                     '--event-freqs', *info[0][1:],
                     '--max-clusters', str(info[1]),

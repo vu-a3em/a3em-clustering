@@ -6,7 +6,7 @@ import math
 import os
 import torch
 import soundfile
-import mfcc_vae_1 as vae
+import mfcc_vae_2 as vae
 import mfcc
 import numpy as np
 
@@ -140,7 +140,7 @@ if __name__ == '__main__':
     parser.add_argument('--clip-duration', type = float, default = 30)
     parser.add_argument('--clips', type = int, default = 2 * 60 * 24)
     parser.add_argument('--bg-change-prob', type = float, default = 0.1)
-    parser.add_argument('--event-prob', type = float, default = 0.25)
+    parser.add_argument('--event-prob', type = float, default = 1.0)
     parser.add_argument('--event-freqs', type = str, nargs = '*', default = [])
     parser.add_argument('--max-clusters', type = int, default = 256)
     parser.add_argument('--max-weight', type = float, default = 1024.0)
@@ -173,7 +173,10 @@ if __name__ == '__main__':
         print(f'using standard model on device "{device}"\n')
 
         encoder = vae.Encoder(embedding_size = args.embedding_size).to(device)
-        encoder.load_state_dict(torch.load('mfcc-untested-1/encoder-F16-A0.9-E256-L171.pt', weights_only = True))
+        # encoder.load_state_dict(torch.load('mfcc-untested-1/encoder-F16-A0.9-E256-L171.pt', weights_only = True)) # version used in paper
+        # encoder.load_state_dict(torch.load('mfcc-2-untested-1/encoder-F16-A0.999-E256-L33.pt', weights_only = True))
+        encoder.load_state_dict(torch.load('mfcc-2-untested-2/encoder-F16-A0.95-E256-L34.pt', weights_only = True))
+        # encoder.load_state_dict(torch.load('mfcc-3-untested-1/encoder-F16-A0.95-E256-L39.pt', weights_only = True))
         encoder.eval()
 
     qprint('loading sounds...')
