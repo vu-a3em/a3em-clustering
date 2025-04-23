@@ -1,10 +1,12 @@
 import argparse
 import numpy as np
+from typing import Optional
 import re
 import os
+import sys
 
 DATA_REGEX = re.compile(r'^\s*(.*):\s*(\d+)\s*->\s*(\d+)')
-def read_file(path: str) -> np.array:
+def read_file(path: str) -> Optional[np.ndarray]:
     try:
         with open(path, 'r') as f:
             data = f.readlines()
@@ -13,8 +15,7 @@ def read_file(path: str) -> np.array:
         del data['None']
         return np.array(list(data.values()))
     except Exception as e:
-        print('error:', path)
-        raise e
+        return None
 
 def metric(data: np.ndarray) -> float:
     ratios = data[:,1] / data[:,0]
@@ -24,7 +25,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('path', type = str)
     parser.add_argument('-n', type = int, default = 3)
+    parser.add_argument('--purge', action = 'store_true')
     args = parser.parse_args()
+
+    data = []
+    for x in os.listdir(args.path):
+        p = f'{args.path}/{x}'
+        y = read_file(p)
+        if y is not None:
+            data.append([x, metric(y)])
+        elif args.purge:
+            os.remove(p)
+        else:
+            print(f'corrupted data: {p}', file = sys.stderr)
+            sys.exit(1)
 
     data = [[x, metric(read_file(f'{args.path}/{x}'))] for x in os.listdir(args.path)]
     data.sort(key = lambda x: -x[1])
