@@ -6,7 +6,7 @@ import math
 import os
 import torch
 import soundfile
-import mfcc_vae_2 as vae
+import mfcc_vae_3 as vae
 import mfcc
 import numpy as np
 
@@ -175,8 +175,8 @@ if __name__ == '__main__':
         encoder = vae.Encoder(embedding_size = args.embedding_size).to(device)
         # encoder.load_state_dict(torch.load('mfcc-untested-1/encoder-F16-A0.9-E256-L171.pt', weights_only = True)) # version used in paper
         # encoder.load_state_dict(torch.load('mfcc-2-untested-1/encoder-F16-A0.999-E256-L33.pt', weights_only = True))
-        encoder.load_state_dict(torch.load('mfcc-2-untested-2/encoder-F16-A0.95-E256-L34.pt', weights_only = True))
-        # encoder.load_state_dict(torch.load('mfcc-3-untested-1/encoder-F16-A0.95-E256-L39.pt', weights_only = True))
+        # encoder.load_state_dict(torch.load('mfcc-2-untested-2/encoder-F16-A0.95-E256-L34.pt', weights_only = True))
+        encoder.load_state_dict(torch.load('mfcc-3-untested-1/encoder-F16-A0.95-E256-L34.pt', weights_only = True))
         encoder.eval()
 
     qprint('loading sounds...')

@@ -23,11 +23,12 @@ def metric(data: np.ndarray) -> float:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('path', type = str)
+    parser.add_argument('-n', type = int, default = 3)
     args = parser.parse_args()
 
     data = [[x, metric(read_file(f'{args.path}/{x}'))] for x in os.listdir(args.path)]
     data.sort(key = lambda x: -x[1])
-    for x in data[:3]:
+    for x in data[:min(len(data), args.n)]:
         print(x)
         with open(f'{args.path}/{x[0]}', 'r') as f: print(f.read())
         print()
