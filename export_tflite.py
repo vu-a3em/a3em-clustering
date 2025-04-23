@@ -1,6 +1,6 @@
 import torch
 import onnx
-import mfcc_vae_1 as mfcc_vae
+import mfcc_vae_4 as mfcc_vae
 import dataloader
 import mfcc
 import onnx_tf
@@ -15,13 +15,15 @@ ONNX_OPSET_VERSION = 13
 # load the pytorch model
 
 encoder = mfcc_vae.Encoder(embedding_size = 16)
-encoder.load_state_dict(torch.load('mfcc-untested-3/encoder-F16-A0.999-E256-L183.pt'))
+# encoder.load_state_dict(torch.load('mfcc-untested-3/encoder-F16-A0.999-E256-L183.pt'))
+encoder.load_state_dict(torch.load('mfcc-4-untested-3/encoder-F16-A0.95-E256-L36.pt'))
 encoder.eval()
 encoder.cpu()
 
 # convert pytorch model to onnx
 
-example = torch.rand(1, 65, 65)
+# example = torch.rand(1, 65, 65)
+example = torch.rand(1, 16, 65)
 torch.onnx.export(encoder, example, ONNX_MODEL_PATH, opset_version = ONNX_OPSET_VERSION)
 
 # map some symbol names because onnx is buggy apparently
@@ -84,3 +86,5 @@ tflite_model = converter.convert()
 
 with open(TFLITE_MODEL_PATH, 'wb') as f:
     f.write(tflite_model)
+
+print('success!')
