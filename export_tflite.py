@@ -5,12 +5,21 @@ import dataloader
 import mfcc
 import onnx_tf
 import tensorflow as tf
+from typing import Callable
 import numpy as np
 
 ONNX_MODEL_PATH = 'model.onnx'
 TF_MODEL_PATH = 'model.pb'
 TFLITE_MODEL_PATH = 'model.tflite'
 ONNX_OPSET_VERSION = 13
+
+class ModelMapper(torch.nn.Module):
+    def __init__(self, m: torch.nn.Module, f: Callable):
+        super().__init__()
+        self.m = m
+        self.f = f
+    def forward(self, *args, **kwargs):
+        return self.f(self.m.forward(*args, **kwargs))
 
 # load the pytorch model
 
@@ -22,16 +31,15 @@ encoder.cpu()
 
 # convert pytorch model to onnx
 
-# example = torch.rand(1, 65, 65)
 example = torch.rand(1, 16, 65)
-torch.onnx.export(encoder, example, ONNX_MODEL_PATH, opset_version = ONNX_OPSET_VERSION)
+torch.onnx.export(ModelMapper(encoder, lambda x: x[0]), example, ONNX_MODEL_PATH, opset_version = ONNX_OPSET_VERSION)
 
 # map some symbol names because onnx is buggy apparently
 # https://stackoverflow.com/questions/76839366/tf-rep-export-graphtf-model-path-keyerror-input-1
 
 onnx_model = onnx.load(ONNX_MODEL_PATH)
 
-name_map = { 'onnx::Reshape_0': 'onnx_reshape_0' }
+name_map = { 'onnx::Reshape_0': 'onnx__Reshape_0' }
 
 new_inputs = []
 for inp in onnx_model.graph.input:
@@ -58,21 +66,12 @@ onnx_tf.backend.prepare(onnx_model).export_graph(TF_MODEL_PATH)
 
 # convert tensorflow model to tf-lite
 
-def prep_dataset(data):
-    X = []
-    Y = []
-    for i, (label, samples) in enumerate(data.items()):
-        for sample in samples:
-            X.append(mfcc.mfcc_spectrogram_for_learning(sample, dataloader.UNIFORM_SAMPLE_RATE))
-            Y.append(i)
-    return np.array(X, dtype = np.float32), np.array(Y, dtype = np.float32)
+def preprocess_stream():
+    print('loading dataset...')
+    raw_dataset = dataloader.get_dataset(None, 8192)
 
-print('loading dataset...')
-raw_dataset = dataloader.get_dataset(None, 8192)
-
-print('processing dataset for quantization metrics...')
-def preprocess_stream(raw):
-    for label, samples in raw.items():
+    print('processing dataset for quantization metrics...')
+    for label, samples in raw_dataset.items():
         for sample in samples:
             yield [mfcc.mfcc_spectrogram_for_learning(sample, dataloader.UNIFORM_SAMPLE_RATE).astype(np.float32)]
 
@@ -81,7 +80,7 @@ converter.optimizations = [tf.lite.Optimize.DEFAULT]
 converter.target_spec.supported_types = [tf.int8]
 converter.inference_input_type = tf.float32
 converter.inference_output_type = tf.float32
-converter.representative_dataset = lambda: preprocess_stream(raw_dataset)
+converter.representative_dataset = preprocess_stream
 tflite_model = converter.convert()
 
 with open(TFLITE_MODEL_PATH, 'wb') as f:
