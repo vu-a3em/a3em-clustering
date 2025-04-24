@@ -6,6 +6,7 @@ import dataloader
 import mfcc
 import onnx_tf
 import tensorflow as tf
+from typing import Callable
 import numpy as np
 import random
 
@@ -17,6 +18,14 @@ ONNX_OPSET_VERSION = 13
 QAT_EPOCHS = 5
 BATCH_SIZE = 35
 LR = 1e-4
+
+class ModelMapper(torch.nn.Module):
+    def __init__(self, m: torch.nn.Module, f: Callable):
+        super().__init__()
+        self.m = m
+        self.f = f
+    def forward(self, *args, **kwargs):
+        return self.f(self.m.forward(*args, **kwargs))
 
 # load the pytorch model
 
@@ -87,7 +96,7 @@ def remove_qat_modules(model):
     return model
 encoder = remove_qat_modules(encoder) # not ideal but onnx doesn't support quant stubs
 
-torch.onnx.export(encoder, torch.rand(1, 16, 65), ONNX_MODEL_PATH, opset_version = ONNX_OPSET_VERSION)
+torch.onnx.export(ModelMapper(encoder, lambda x: x[0]), torch.rand(1, 16, 65), ONNX_MODEL_PATH, opset_version = ONNX_OPSET_VERSION)
 
 # map some symbol names because onnx is buggy apparently
 # https://stackoverflow.com/questions/76839366/tf-rep-export-graphtf-model-path-keyerror-input-1
@@ -95,7 +104,7 @@ torch.onnx.export(encoder, torch.rand(1, 16, 65), ONNX_MODEL_PATH, opset_version
 onnx_model = onnx.load(ONNX_MODEL_PATH)
 
 name_map = {
-    'onnx::Reshape_0': 'onnx_reshape_0',
+    'onnx::Reshape_0': 'onnx__Reshape_0',
     'x.1': 'x_1',
 }
 
