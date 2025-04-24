@@ -65,6 +65,8 @@ class Encoder(torch.nn.Module):
             x = relu(step(x))
 
         return self.dequant_mean(self.mean(x)), self.dequant_logstd(self.logstd(x))
+    def fuse_model(self):
+        pass
 
 class Decoder(torch.nn.Module):
     def __init__(self, *, embedding_size):

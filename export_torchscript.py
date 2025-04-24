@@ -16,7 +16,7 @@ torch.jit.trace(encoder, example).save('portable-model-f32.pt')
 
 # -- quantized --
 
-encoder.qconfig = torch.quantization.get_default_qconfig('qnnpack')
+encoder.qconfig = torch.quantization.get_default_qconfig('fbgemm')
 encoder_prep = torch.quantization.prepare(encoder, inplace = False)
 
 raw_dataset = dataloader.get_dataset(None, 8192)
