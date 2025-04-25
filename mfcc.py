@@ -65,7 +65,7 @@ def mfcc_spectrogram_for_learning(audio, sample_rate):
     fft_size = int(30 / 1000 * sample_rate)
     if fft_size <= 0:
         raise RuntimeError('input too small!')
-    s = mfcc_spectrogram(audio, fft_size = fft_size, sample_rate = sample_rate, mel_filters = 32, dct_filters = 16)
+    s = mfcc_spectrogram(audio, fft_size = fft_size, sample_rate = sample_rate, mel_filters = 16, dct_filters = 16)
     std = np.std(s)
 
     s -= np.mean(s)

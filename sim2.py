@@ -6,7 +6,7 @@ import math
 import os
 import torch
 import soundfile
-import mfcc_vae_4 as vae
+import mfcc_vae_5 as vae
 import mfcc
 import numpy as np
 
@@ -92,14 +92,14 @@ def random_extend(x: np.ndarray, s: int) -> np.ndarray:
 
 def create_fade(size, *, fade_duration, sr):
     t = min(round(fade_duration * sr), round(size / 4))
-    return np.concat([
+    return np.concatenate([
         np.linspace(0, 1, t),
         np.ones((size - 2 * t,)),
         np.linspace(1, 0, t),
     ])
 
 def energy_peak(x: np.array, *, radius: int):
-    kernel = np.concat([
+    kernel = np.concatenate([
         np.linspace(0, 1, radius + 2)[1:-1],
         [1],
         np.linspace(1, 0, radius + 2)[1:-1],
@@ -110,7 +110,7 @@ def energy_chunks(x: np.array, *, size: int, radius: int, count: int):
     res = []
     x = np.copy(x)
     half = size // 2
-    e = np.concat([np.zeros((half,)), x, np.zeros((half,))])
+    e = np.concatenate([np.zeros((half,)), x, np.zeros((half,))])
     for _ in range(count):
         p = energy_peak(x, radius = radius)
         res.append(e[p : p + size])
@@ -178,7 +178,8 @@ if __name__ == '__main__':
         # encoder.load_state_dict(torch.load('mfcc-2-untested-2/encoder-F16-A0.95-E256-L34.pt', weights_only = True))
         # encoder.load_state_dict(torch.load('mfcc-3-untested-1/encoder-F16-A0.95-E256-L34.pt', weights_only = True))
         # encoder.load_state_dict(torch.load('mfcc-4-untested-1/encoder-F16-A0.95-E256-L38.pt', weights_only = True))
-        encoder.load_state_dict(torch.load('mfcc-4-untested-3/encoder-F16-A0.95-E256-L36.pt', weights_only = True))
+        # encoder.load_state_dict(torch.load('mfcc-4-untested-3/encoder-F16-A0.95-E256-L36.pt', weights_only = True))
+        encoder.load_state_dict(torch.load('mfcc-5-untested-4/encoder-F16-A0.95-E256-L34.pt', weights_only = True))
         encoder.eval()
 
     qprint('loading sounds...')
