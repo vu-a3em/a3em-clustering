@@ -59,14 +59,14 @@ class ClusterFilterAug3:
             center = (np.sum((self.means[close].T * self.weights[close]).T, axis = 0) + mean) / (np.sum(self.weights[close]) + 1)
             weight = min(np.sum(self.weights[close]) + 1, self.max_weight)
             self.means = np.concatenate([
+                np.zeros((self.means.shape[0] - (np.sum(~close) + 1), self.means.shape[1])),
                 self.means[~close],
                 [ center ],
-                np.zeros((self.means.shape[0] - (np.sum(~close) + 1), self.means.shape[1])),
             ])
             self.weights = np.concatenate([
+                np.zeros((self.weights.shape[0] - (np.sum(~close) + 1),)),
                 self.weights[~close],
                 [ weight ],
-                np.zeros((self.weights.shape[0] - (np.sum(~close) + 1),)),
             ])
             return False
         else:
