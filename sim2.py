@@ -9,6 +9,7 @@ import soundfile
 import mfcc_vae_8 as vae
 import mfcc
 import numpy as np
+import filter
 
 from typing import Dict, Any
 
@@ -16,44 +17,6 @@ QUIET = False
 def qprint(*args, **kwargs):
     if not QUIET:
         print(*args, **kwargs)
-
-class ClusterFilterAug3:
-    def __init__(self, max_clusters, max_weight, embedding_size, thresh):
-        self.means = np.zeros((max_clusters, embedding_size))
-        self.weights = np.zeros((max_clusters,))
-        self.max_weight = max_weight
-        self.max_clusters = max_clusters
-        self.base_radius = thresh
-
-    def insert(self, mean: np.ndarray, std: np.ndarray) -> bool:
-        assert mean.shape == self.means.shape[1:] and mean.shape == std.shape and self.means.shape[0] == self.max_clusters and self.weights.shape == (self.max_clusters,)
-        l2_norm = np.sqrt(np.sum((self.means - mean) ** 2, axis = 1))
-        close = l2_norm <= np.sqrt(self.weights) * self.base_radius
-
-        if np.any(close):
-            center = (np.sum((self.means[close].T * self.weights[close]).T, axis = 0) + mean) / (np.sum(self.weights[close]) + 1)
-            weight = min(np.sum(self.weights[close]) + 1, self.max_weight)
-            self.means = np.concatenate([
-                np.zeros((self.means.shape[0] - (np.sum(~close) + 1), self.means.shape[1])),
-                self.means[~close],
-                [ center ],
-            ])
-            self.weights = np.concatenate([
-                np.zeros((self.weights.shape[0] - (np.sum(~close) + 1),)),
-                self.weights[~close],
-                [ weight ],
-            ])
-            return False
-        else:
-            self.means = np.concatenate([
-                self.means[1:],
-                [ mean ],
-            ])
-            self.weights = np.concatenate([
-                self.weights[1:],
-                [ 1 ],
-            ])
-            return True
 
 def load_sounds(path: str, *, min_length: float = 0, max_length: float = math.inf, mult_length: float = None, max_silence_ratio: float = None) -> Dict[str, np.ndarray]:
     res = { cls: [] for cls in sorted(os.listdir(path)) }
@@ -227,7 +190,7 @@ if __name__ == '__main__':
     background_class = None
     clip_len = dataloader.UNIFORM_SAMPLE_RATE * args.clip_duration
     for i in range(args.iterations):
-        f = ClusterFilterAug3(args.max_clusters, args.max_weight, args.embedding_size, args.filter_thresh)
+        f = filter.ClusterFilter(args.max_clusters, args.max_weight, args.embedding_size, args.filter_thresh)
         def vote_retain(x: np.ndarray) -> bool:
             votes = []
             for seg in energy_chunks(x, size = dataloader.UNIFORM_SAMPLE_RATE * dataloader.SAMPLE_DURATION_SECS, count = args.chunks, radius = args.radius):
