@@ -1,7 +1,7 @@
 import torch
 import torch.quantization
 import onnx
-import mfcc_vae_4 as mfcc_vae
+import mfcc_vae_8 as mfcc_vae
 import dataloader
 import mfcc
 import onnx_tf
@@ -31,7 +31,8 @@ class ModelMapper(torch.nn.Module):
 
 encoder = mfcc_vae.Encoder(embedding_size = 16)
 # encoder.load_state_dict(torch.load('mfcc-untested-3/encoder-F16-A0.999-E256-L183.pt'))
-encoder.load_state_dict(torch.load('mfcc-4-untested-3/encoder-F16-A0.95-E256-L36.pt'))
+# encoder.load_state_dict(torch.load('mfcc-4-untested-3/encoder-F16-A0.95-E256-L36.pt'))
+encoder.load_state_dict(torch.load('mfcc-8-untested-4/encoder-F16-A0.5-E256-L22.pt'))
 encoder.eval()
 encoder.cpu()
 
