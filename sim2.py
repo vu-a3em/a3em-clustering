@@ -195,8 +195,8 @@ if __name__ == '__main__':
             votes = []
             for seg in energy_chunks(x, size = dataloader.UNIFORM_SAMPLE_RATE * dataloader.SAMPLE_DURATION_SECS, count = args.chunks, radius = args.radius):
                 with torch.no_grad():
-                    mean, std = encoder.forward(torch.tensor(mfcc.mfcc_spectrogram_for_learning(seg, dataloader.UNIFORM_SAMPLE_RATE)[np.newaxis,:], dtype = torch.float).to(device))
-                    votes.append(f.insert(mean.cpu().numpy().squeeze(), std.cpu().numpy().squeeze()))
+                    mean, _ = encoder.forward(torch.tensor(mfcc.mfcc_spectrogram_for_learning(seg, dataloader.UNIFORM_SAMPLE_RATE)[np.newaxis,:], dtype = torch.float).to(device))
+                    votes.append(f.insert(mean.cpu().numpy().squeeze()))
             return np.mean(votes) > args.vote_thresh
 
         for i in range(args.clips):
