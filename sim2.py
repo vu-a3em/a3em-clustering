@@ -10,6 +10,7 @@ import mfcc_vae_8 as vae
 import mfcc
 import numpy as np
 import filter
+import tensorflow as tf
 
 from typing import Dict, Any
 
@@ -70,6 +71,9 @@ def energy_peak(x: np.array, *, radius: int):
     return np.argmax(np.convolve(x**2, kernel, mode = 'same'))
 
 def energy_chunks(x: np.array, *, size: int, radius: int, count: int):
+    if count == 0:
+        return np.split(x, len(x) // size)
+
     res = []
     x = np.copy(x)
     half = size // 2
@@ -90,6 +94,15 @@ def chunks(x: np.array, *, size: int, overlaps: int) -> np.array:
         p += s
     return np.array(res)
 
+class TFLiteModel:
+    def __init__(self, *args, **kwargs):
+        self.model = tf.lite.Interpreter(*args, **kwargs)
+        self.model.allocate_tensors()
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.model.set_tensor(0, x)
+        self.model.invoke()
+        return self.model.get_tensor(0)
+
 if __name__ == '__main__':
     # x = np.array([1,3,2,3,2,1,4,2,3,1,24,1000,23,21,2,3,1,3,2,1,3])
     # for c in energy_chunks(x, size = 8, radius = 5, count = 3):
@@ -102,7 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--seed', type = int)
     parser.add_argument('--clip-duration', type = float, default = 30)
     parser.add_argument('--clips', type = int, default = 2 * 60 * 24)
-    parser.add_argument('--bg-change-prob', type = float, default = 0.1)
+    parser.add_argument('--bg-change-prob', type = float, default = 0.01666)
     parser.add_argument('--event-prob', type = float, default = 1.0)
     parser.add_argument('--event-freqs', type = str, nargs = '*', default = [])
     parser.add_argument('--max-clusters', type = int, default = 256)
@@ -127,10 +140,9 @@ if __name__ == '__main__':
 
     if args.quantized:
         device = 'cpu'
-        print(f'using quantized model on device "{device}"\n')
+        print(f'using tflite quantized model on device "{device}"\n')
 
-        encoder = torch.jit.load('portable-model-i8.pt').to(device)
-        encoder.eval()
+        encoder = TFLiteModel(model_path = 'model.tflite')
     else:
         device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
         print(f'using standard model on device "{device}"\n')

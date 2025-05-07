@@ -19,7 +19,7 @@ def read_file(path: str) -> Optional[np.ndarray]:
 
 def metric(data: np.ndarray) -> float:
     ratios = data[:,1] / data[:,0]
-    return np.mean(data[:,1])**0.9 * (np.min(ratios[1:]) - ratios[0]) / (ratios[0] if ratios[0] > 0 else 1)
+    return np.mean(data[:,1])**0.92 * (np.min(ratios[1:]) - ratios[0]) / (ratios[0] if ratios[0] > 0 else 1)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
